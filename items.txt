@@ -1,0 +1,7 @@
+# Hashtags (#) represent comments and will be ignored. To use hashtags in your item title use a backslash (\) before the hashtag (\#).
+# This is a comment and will be ignored
+This part will be read as an item # This part will not
+This is an item which includes a hashtag \# in the name and will be read
+
+# An example of how this can be used is provided below:
+Chocolate # Any chocolate
