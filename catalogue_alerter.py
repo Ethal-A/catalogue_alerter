@@ -48,16 +48,26 @@ async def scrape_upcoming_coles_catalogue_pages(browser, catalogue_pages_to_scra
     page = await browser.newPage()  # Launch a headless Chromium browser
     await page.goto("https://www.coles.com.au/catalogues")
 
-    # TODO: Check if catalogue is available (perhaps using: current_catalogue_button = await page.waitForXPath('//a[@aria-label="View next week\'s catalogue"]'))
-    await page.evaluate(r'''document.evaluate('//a[@aria-label="View next week\'s catalogue"]', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue.click();''')
+    # Open up catalogue
+    catalogue_button = await page.waitForXPath('//a[@aria-label="View this week\'s catalogue"]') # TODO: Also search through next week's catalogue
+    catalogue_url = await page.evaluate('(element) => element.getAttribute("href")', catalogue_button)
+    await page.goto('https://www.coles.com.au' + catalogue_url)
+    await page.waitForXPath('//li[@class="page1"]')
 
-    # TODO: Fix error
-        # Future exception was never retrieved
-        # future: <Future finished exception=NetworkError('Protocol error (Target.sendMessageToTarget): No session with given id')>
-        # pyppeteer.errors.NetworkError: Protocol error (Target.sendMessageToTarget): No session with given id
-    await page.waitForXPath('//li[@class="page1"]')    
+    # Get list of pages in catalogue
+    # TODO: currently this just returns an empty list and this needs to be fixed
+    pages = await page.evaluate('''
+        nodes = document.evaluate('//li[@class="page1" or @class="page2" or @class="page3"]//div[@class="slide-content objloaded"]', document);
+        node = nodes.iterateNext();
+        pages = []
+        while (node) {
+        pages.push(node);
+            node = nodes.iterateNext();
+        }
+        pages;''')
+    print(pages, type(pages))
 
-    await page.screenshot({'path': f'{OUT_FOLDER}/catalogue_screenshot.png'})
+    await page.screenshot({'path': f'{OUT_FOLDER}/catalogue_screenshot.png', 'fullPage': True}) # Simply proves that page opened successfully
     
     await page.close()
 
