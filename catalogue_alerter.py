@@ -40,36 +40,33 @@ def read_alert_items(file_name: str ='items.txt'):
         print(f"File '{file_name}' not found.")
         return []
 
-async def scrape_upcoming_coles_catalogue_pages(browser, catalogue_pages_to_scrape: list[str] = ['page1', 'page2']):
+async def scrape_coles_catalogue(browser, upcoming: bool = True, catalogue_pages: list[str] = ['page1', 'page2', 'page3']):
     '''
-    Scrapes pages from the upcoming coles catalogue (if it is available).
-    '''    
-    # Create a new page and go to coles catalogue website
-    page = await browser.newPage()  # Launch a headless Chromium browser
+    Scrapes pages from the coles catalogue (if it is available).
+    '''
+    # Create a new page and go to the cole catalogue website
+    page = await browser.newPage()
     await page.goto("https://www.coles.com.au/catalogues")
 
-    # Open up catalogue
-    catalogue_button = await page.waitForXPath('//a[@aria-label="View this week\'s catalogue"]') # TODO: Also search through next week's catalogue
+    # Open up the catalogue TODO: test when upcoming is false.
+    catalogue_button = await page.waitForXPath('//a[@aria-label="View next week\'s catalogue"]') if upcoming else await page.waitForXPath('//a[@aria-label="View this week\'s catalogue"]')
     catalogue_url = await page.evaluate('(element) => element.getAttribute("href")', catalogue_button)
     await page.goto('https://www.coles.com.au' + catalogue_url)
+
+    # Retrieve item titles (got help from ChatGPT for code below)
     await page.waitForXPath('//li[@class="page1"]')
-
-    # Get list of pages in catalogue
-    # TODO: currently this just returns an empty list and this needs to be fixed
-    pages = await page.evaluate('''
-        nodes = document.evaluate('//li[@class="page1" or @class="page2" or @class="page3"]//div[@class="slide-content objloaded"]', document);
-        node = nodes.iterateNext();
-        pages = []
-        while (node) {
-        pages.push(node);
-            node = nodes.iterateNext();
+    titles = await page.evaluate('''() => {
+    const titles = [];
+    const elements = document.querySelectorAll(\''''+ ''.join(f'li.{cp}, '.format(cp) for cp in catalogue_pages)[:-2] + ''' .slide-content.objloaded a');
+    elements.forEach((element) => {
+        if (element instanceof HTMLAnchorElement) {
+            titles.push(element.title);
         }
-        pages;''')
-    print(pages, type(pages))
+    });
+    return titles;
+    }''')
 
-    await page.screenshot({'path': f'{OUT_FOLDER}/catalogue_screenshot.png', 'fullPage': True}) # Simply proves that page opened successfully
-    
-    await page.close()
+    return titles
 
 async def main():
     # Parse arguments
@@ -84,8 +81,9 @@ async def main():
     print(alert_items)
 
     try:
-        browser = await launch()
-        await scrape_upcoming_coles_catalogue_pages(browser)
+        # TODO: Make the executable path an input that the user can provide
+        browser = await launch(executablePath="C:\Program Files\Google\Chrome\Application\chrome.exe", headless=True)
+        await scrape_coles_catalogue(browser, upcoming=False)
     except Exception as e:
         print("Error:", str(e))
     finally:
