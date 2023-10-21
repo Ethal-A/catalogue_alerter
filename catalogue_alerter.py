@@ -48,13 +48,13 @@ async def scrape_coles_catalogue(browser, upcoming: bool = True, catalogue_pages
     page = await browser.newPage()
     await page.goto("https://www.coles.com.au/catalogues")
 
-    # Open up the catalogue TODO: test when upcoming is false.
+    # Open up the catalogue TODO: Test when upcoming is false. TODO: Handle case of next week's catalogue being not available
     catalogue_button = await page.waitForXPath('//a[@aria-label="View next week\'s catalogue"]') if upcoming else await page.waitForXPath('//a[@aria-label="View this week\'s catalogue"]')
     catalogue_url = await page.evaluate('(element) => element.getAttribute("href")', catalogue_button)
     await page.goto('https://www.coles.com.au' + catalogue_url)
 
     # Retrieve item titles (got help from ChatGPT for code below)
-    await page.waitForXPath('//li[@class="page1"]')
+    await page.waitForXPath('//a[@aria-label="Specials of the Week"]') # Wait for the anchors on the pages to load
     titles = await page.evaluate('''() => {
     const titles = [];
     const elements = document.querySelectorAll(\''''+ ''.join(f'li.{cp}, '.format(cp) for cp in catalogue_pages)[:-2] + ''' .slide-content.objloaded a');
@@ -78,12 +78,12 @@ async def main():
 
     # Read items to alert on
     alert_items = read_alert_items(args.read)
-    print(alert_items)
 
     try:
         # TODO: Make the executable path an input that the user can provide
         browser = await launch(executablePath="C:\Program Files\Google\Chrome\Application\chrome.exe", headless=True)
-        await scrape_coles_catalogue(browser, upcoming=False)
+        titles = await scrape_coles_catalogue(browser, upcoming=False)
+        print('from catalogue:', titles)
     except Exception as e:
         print("Error:", str(e))
     finally:
