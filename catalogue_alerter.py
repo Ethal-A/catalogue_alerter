@@ -1,9 +1,22 @@
 import argparse
 import re
 import asyncio
-from pyppeteer import launch
+import pyppeteer
 
 OUT_FOLDER = 'out'
+
+def match_items(alert_items: list[str], catalogue_items: list[str]) -> list[str]:
+    '''
+    Finds case-insensitive occurances of match_items inside catalogue_items.
+    '''
+    matches = []
+    for alert_item in alert_items:
+        alert_item = alert_item.lower()
+        for catalogue_item in catalogue_items:
+            catalogue_item = catalogue_item.lower()
+            if alert_item in catalogue_item:
+                matches.append(f'{alert_item}: {catalogue_item}')
+    return matches
 
 def read_alert_items(file_name: str ='items.txt'):
     '''
@@ -68,6 +81,45 @@ async def scrape_coles_catalogue(browser, upcoming: bool = True, catalogue_pages
 
     return titles
 
+async def scrape_coles_catalogue(browser, upcoming: bool = True, catalogue_pages: list[str] = ['page1', 'page2', 'page3']):
+    '''
+    Scrapes pages from the woolworths catalogue (if it is available).
+    '''
+    # Create a new page and go to the cole catalogue website
+    page = await browser.newPage()
+    await page.goto("https://www.coles.com.au/catalogues")
+
+    # Open up the catalogue and handle exception scenarios
+    catalogue_button = None
+    try:
+        button_to_retrieve = '"View next week\'s catalogue"' if upcoming else '"View this week\'s catalogue"'
+        catalogue_button = await page.waitForXPath(f'//a[@aria-label={button_to_retrieve}]')
+    except pyppeteer.errors.TimeoutError as timeout_error:
+        print(f'Failed to retrieve Coles catalogue button {button_to_retrieve} within 30 seconds')
+        print(timeout_error)
+        return []
+    except Exception as exception:
+        print(f'Something went wrong when trying to retrieve Coles catalogue button {button_to_retrieve}')
+        print(exception)
+        return []
+    catalogue_url = await page.evaluate('(element) => element.getAttribute("href")', catalogue_button)
+    await page.goto('https://www.coles.com.au' + catalogue_url)
+
+    # Retrieve item titles (got help from ChatGPT for code below)
+    await page.waitForXPath('//a[@aria-label="Specials of the Week"]') # Wait for the anchors on the pages to load
+    titles = await page.evaluate('''() => {
+    const titles = [];
+    const elements = document.querySelectorAll(\''''+ ''.join(f'li.{cp}, '.format(cp) for cp in catalogue_pages)[:-2] + ''' .slide-content.objloaded a');
+    elements.forEach((element) => {
+        if (element instanceof HTMLAnchorElement) {
+            titles.push(element.title);
+        }
+    });
+    return titles;
+    }''')
+
+    return titles
+
 async def main():
     # Parse arguments
     parser = argparse.ArgumentParser(description='Catalogue Alerter')
@@ -78,12 +130,12 @@ async def main():
 
     # Read items to alert on
     alert_items = read_alert_items(args.read)
-
     try:
         # TODO: Make the executable path an input that the user can provide
-        browser = await launch(executablePath="C:\Program Files\Google\Chrome\Application\chrome.exe", headless=True)
+        browser = await pyppeteer.launch(executablePath="C:\Program Files\Google\Chrome\Application\chrome.exe", headless=True)
         titles = await scrape_coles_catalogue(browser, upcoming=False)
-        print('from catalogue:', titles)
+        matches = match_items(alert_items, titles)
+        print(f'Coles matches: {matches}')
     except Exception as e:
         print("Error:", str(e))
     finally:
