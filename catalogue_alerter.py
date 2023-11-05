@@ -79,16 +79,23 @@ async def scrape_coles_catalogue(browser, upcoming: bool = True, catalogue_pages
 
     # Retrieve item titles (got help from ChatGPT for code below)
     await page.waitForXPath('//a[@aria-label="Specials of the Week"]') # Wait for the anchors on the pages to load
-    # FIX: Only captures anchors on last page
     titles = await page.evaluate('''() => {
-    const titles = [];
-    const elements = document.querySelectorAll(\''''+ ''.join(f'li.{cp}, ' for cp in catalogue_pages)[:-2] + ''' .slide-content.objloaded a');
-    elements.forEach((element) => {
-        if (element instanceof HTMLAnchorElement) {
-            titles.push(element.title);
-        }
-    });
-    return titles;
+        const titles = [];
+        const pageNames = [''' + ''.join(f'"{cp}", ' for cp in catalogue_pages)[:-2] + '''];
+        const allElements = [];
+
+        pageNames.forEach(pageName => {
+        const selector = `li.${pageName} .slide-content.objloaded a`;
+        const elements = Array.from(document.querySelectorAll(selector));
+        allElements.push(...elements);
+        });
+
+        allElements.forEach((element) => {
+            if (element instanceof HTMLAnchorElement && element.title != '') {
+                titles.push(element.title);
+            }
+        });
+        return titles;
     }''')
 
     return titles
@@ -118,13 +125,13 @@ async def scrape_woolworths_catalogue(browser, postcode: str, upcoming: bool = T
 
     # TODO: Test and accomodate upcoming catalogue
     # TODO: Handle exception scenarios
-    # FIX: Getting error 'Error: Node is either not visible or not an HTMLElement'
     # Open up the catalogue
-    catalogue_button = await page.waitForXPath('//a[@class="read-catalogue"]') # Element is dynamically loaded in so we must wait for it to become visible.
+    catalogue_button = await page.waitForXPath('//a[@class="read-catalogue"]', options={ 'visible': True }) # Element is dynamically loaded in so we must wait for it to become visible.
     await catalogue_button.click()
 
+    # await asyncio.sleep(3)
     # Retrieve item titles (got help from ChatGPT for code below)
-    await page.waitForXPath('//div[@id="sf-catalogue"]') # Wait for the anchors on the pages to load
+    await page.waitForNavigation(waitUntil=['networkidle0']) # Wait for the anchors on the pages to load (slightly different to Coles)
     titles = await page.evaluate('''() => {
         const titles = [];
         const pageNames = [''' + ''.join(f'"{cp}", ' for cp in catalogue_pages)[:-2] + '''];
@@ -159,15 +166,17 @@ async def main():
     try:
         # TODO: Make the executable path an input that the user can provide
         browser = await pyppeteer.launch(executablePath="C:\Program Files\Google\Chrome\Application\chrome.exe", headless=True)
-        coles_catalogue_items = await scrape_coles_catalogue(browser, upcoming=False)
-        woolworths_catalogue_items = await scrape_woolworths_catalogue(browser, postcode='TODO', upcoming=False)
-        coles_matches = match_items(alert_items, coles_catalogue_items)
-        woolworths_matches = match_items(alert_items, woolworths_catalogue_items)
 
-        # Print results
-        print(f'woolworths: {woolworths_catalogue_items}')
-        print(f'Woolworths matches: {woolworths_matches}')
+        # Search the Coles catalogue
+        coles_catalogue_items = await scrape_coles_catalogue(browser, upcoming=False)
+        coles_matches = match_items(alert_items, coles_catalogue_items)
         print(f'Coles matches: {coles_matches}')
+
+        # Search the Woolworths catalogue
+        # FIX: Error: net::ERR_HTTP2_PROTOCOL_ERROR
+        woolworths_catalogue_items = await scrape_woolworths_catalogue(browser, postcode='TODO', upcoming=False)
+        woolworths_matches = match_items(alert_items, woolworths_catalogue_items)
+        print(f'Woolworths matches: {woolworths_matches}')
     except Exception as e:
         print("Error:", str(e))
     finally:
