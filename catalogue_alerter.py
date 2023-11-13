@@ -2,6 +2,7 @@ import argparse
 import re
 import asyncio
 import pyppeteer
+from datetime import datetime
 
 OUT_FOLDER = 'out'
 
@@ -106,6 +107,7 @@ async def scrape_woolworths_catalogue(browser, postcode: str, upcoming: bool = T
     '''
     # Create a new page and go to the woolworths catalogue website
     page = await browser.newPage()
+    await page.setUserAgent("Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1; SV1; .NET CLR 1.1.4322)"); # Pyppeteer user agent is blocked by Woolworths so we change it
     await page.goto("https://www.woolworths.com.au/shop/catalogue")
 
     # Provide the postcode and open the first location that pops up
@@ -114,6 +116,7 @@ async def scrape_woolworths_catalogue(browser, postcode: str, upcoming: bool = T
         await catalogue_location_autocomplete.type(postcode)
         catalogue_location_first_autocomplete = await page.waitForXPath('//li[@id="wx-digital-catalogue-autocomplete__option--0"]')
         await catalogue_location_first_autocomplete.click()
+        # await page.waitForNavigation()
     except pyppeteer.errors.TimeoutError as timeout_error:
         print(f'Failed to retrieve elements to select the Woolworths location using the provided postcode within 30 seconds')
         print(timeout_error)
@@ -124,14 +127,13 @@ async def scrape_woolworths_catalogue(browser, postcode: str, upcoming: bool = T
         return []
 
     # TODO: Test and accomodate upcoming catalogue
-    # TODO: Handle exception scenarios
-    # Open up the catalogue
-    catalogue_button = await page.waitForXPath('//a[@class="read-catalogue"]', options={ 'visible': True }) # Element is dynamically loaded in so we must wait for it to become visible.
-    await catalogue_button.click()
-
-    # await asyncio.sleep(3)
+    # Note that Woolworths does not have an upcoming catalogue option
+    # The Woolworths xpath is more specific to avoid selecting more than one catalogue
+    catalogue_button = await page.waitForXPath('//div[@class="catalogue-content" and ./h3[@class="heading5" and contains(text(), "Weekly Specials")]]/a[@class="read-catalogue"]') # Element is dynamically loaded in so we must wait for it to become visible.
+    catalogue_url = await page.evaluate('(element) => element.getAttribute("href")', catalogue_button)
+    await page.goto('https://www.woolworths.com.au' + catalogue_url, options={'waitUntil':'networkidle0'}) # Wait for the anchors on the pages to load
+    
     # Retrieve item titles (got help from ChatGPT for code below)
-    await page.waitForNavigation(waitUntil=['networkidle0']) # Wait for the anchors on the pages to load (slightly different to Coles)
     titles = await page.evaluate('''() => {
         const titles = [];
         const pageNames = [''' + ''.join(f'"{cp}", ' for cp in catalogue_pages)[:-2] + '''];
@@ -157,31 +159,48 @@ async def main():
     # Parse arguments
     parser = argparse.ArgumentParser(description='Catalogue Alerter')
     parser.add_argument('--read', '-r', type=str, default='items.txt', help='File name to read items to alert on')
-    parser.add_argument('--output-alerts', '-o', type=str, default='alerts.txt', help='File name to output alerts')
-    parser.add_argument('--output-catalogue', '-c', type=str, help='File name to output catalogue items')
+    parser.add_argument('--alerts-path', '-a', type=str, default='alerts.txt', help='File name to output alerts to')
+    parser.add_argument('--output-items', '-i', action=argparse.BooleanOptionalAction, default=False, help='Output the items in both catalogues')
+    parser.add_argument('--chrome-path', '-e', type=str, help='Absolute path to the achrome file executable')
     args = parser.parse_args()
 
-    # Read items to alert on
+    # Read items arguments
     alert_items = read_alert_items(args.read)
+    chrome_path = args.chrome_path
     try:
-        # TODO: Make the executable path an input that the user can provide
-        browser = await pyppeteer.launch(executablePath="C:\Program Files\Google\Chrome\Application\chrome.exe", headless=True)
+        # For testing purposes only
+        chrome_path = "C:\Program Files\Google\Chrome\Application\chrome.exe"
 
+        # pyppeteer will use a default executable path if args.chrome_path is None
+        browser = await pyppeteer.launch(executablePath=chrome_path, headless=True)
+        
         # Search the Coles catalogue
         coles_catalogue_items = await scrape_coles_catalogue(browser, upcoming=False)
         coles_matches = match_items(alert_items, coles_catalogue_items)
         print(f'Coles matches: {coles_matches}')
 
         # Search the Woolworths catalogue
-        # FIX: Error: net::ERR_HTTP2_PROTOCOL_ERROR
         woolworths_catalogue_items = await scrape_woolworths_catalogue(browser, postcode='TODO', upcoming=False)
         woolworths_matches = match_items(alert_items, woolworths_catalogue_items)
         print(f'Woolworths matches: {woolworths_matches}')
+
+        # Using logger to write content of files
+        if args.output_items:
+            with open('out/coles_catalogue.log', 'a', encoding='utf-8') as file:
+                for item in coles_catalogue_items:
+                    file.write(f'{datetime.now().strftime("%Y-%m-%d")} {item}\n')
+            with open('out/woolworths_catalogue.log', 'a', encoding='utf-8') as file:
+                for item in woolworths_catalogue_items:
+                    file.write(f'{datetime.now().strftime("%Y-%m-%d")} {item}\n')
+        
+        # TODO: write alerts
+        # TODO: email alerts
     except Exception as e:
-        print("Error:", str(e))
+        print('Error:', type(e), '-', str(e))
     finally:
         # Close the browser
-        await browser.close()
+        if 'browser' in locals():
+            await browser.close()
 
 if __name__ == '__main__':
     loop = asyncio.get_event_loop()
