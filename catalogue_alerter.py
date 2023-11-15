@@ -159,8 +159,8 @@ async def main():
     # Parse arguments
     parser = argparse.ArgumentParser(description='Catalogue Alerter')
     parser.add_argument('--read', '-r', type=str, default='items.txt', help='File name to read items to alert on')
-    parser.add_argument('--alerts-path', '-a', type=str, default='alerts.txt', help='File name to output alerts to')
-    parser.add_argument('--output-items', '-i', action=argparse.BooleanOptionalAction, default=False, help='Output the items in both catalogues')
+    parser.add_argument('--output-alerts', '-a', action=argparse.BooleanOptionalAction, default=True, help='Append alerts to files')
+    parser.add_argument('--output-items', '-i', action=argparse.BooleanOptionalAction, default=False, help='Append items found in both catalogues to files')
     parser.add_argument('--chrome-path', '-e', type=str, help='Absolute path to the achrome file executable')
     args = parser.parse_args()
 
@@ -184,7 +184,7 @@ async def main():
         woolworths_matches = match_items(alert_items, woolworths_catalogue_items)
         print(f'Woolworths matches: {woolworths_matches}')
 
-        # Using logger to write content of files
+        # Write catalogue items
         if args.output_items:
             with open('out/coles_catalogue.log', 'a', encoding='utf-8') as file:
                 for item in coles_catalogue_items:
@@ -193,7 +193,15 @@ async def main():
                 for item in woolworths_catalogue_items:
                     file.write(f'{datetime.now().strftime("%Y-%m-%d")} {item}\n')
         
-        # TODO: write alerts
+        # Write alerts
+        if args.output_alerts:
+            with open('out/coles_alerts.log', 'a', encoding='utf-8') as file:
+                for match in coles_matches:
+                    file.write(f'{datetime.now().strftime("%Y-%m-%d")} {match}')
+            with open('out/woolworths_alerts.log', 'a', encoding='utf-8') as file:
+                for match in woolworths_matches:
+                    file.write(f'{datetime.now().strftime("%Y-%m-%d")} {match}')
+
         # TODO: email alerts
     except Exception as e:
         print('Error:', type(e), '-', str(e))
