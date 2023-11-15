@@ -161,8 +161,12 @@ async def main():
     parser.add_argument('--read', '-r', type=str, default='items.txt', help='File name to read items to alert on')
     parser.add_argument('--output-alerts', '-a', action=argparse.BooleanOptionalAction, default=True, help='Append alerts to files')
     parser.add_argument('--output-items', '-i', action=argparse.BooleanOptionalAction, default=False, help='Append items found in both catalogues to files')
+    parser.add_argument('--post-code', '-p', required=True, type=str, help='Postcode to use when scraping from Woolworths')
+    parser.add_argument('--headless-mode', action=argparse.BooleanOptionalAction, default=True, help="Runs the browser without a user interface")
     parser.add_argument('--chrome-path', '-e', type=str, help='Absolute path to the achrome file executable')
     args = parser.parse_args()
+
+    print(args)
 
     # Read items arguments
     alert_items = read_alert_items(args.read)
@@ -172,7 +176,7 @@ async def main():
         chrome_path = "C:\Program Files\Google\Chrome\Application\chrome.exe"
 
         # pyppeteer will use a default executable path if args.chrome_path is None
-        browser = await pyppeteer.launch(executablePath=chrome_path, headless=True)
+        browser = await pyppeteer.launch(executablePath=chrome_path, headless=args.headless_mode)
         
         # Search the Coles catalogue
         coles_catalogue_items = await scrape_coles_catalogue(browser, upcoming=False)
@@ -180,7 +184,7 @@ async def main():
         print(f'Coles matches: {coles_matches}')
 
         # Search the Woolworths catalogue
-        woolworths_catalogue_items = await scrape_woolworths_catalogue(browser, postcode='TODO', upcoming=False)
+        woolworths_catalogue_items = await scrape_woolworths_catalogue(browser, postcode=args.post_code, upcoming=False)
         woolworths_matches = match_items(alert_items, woolworths_catalogue_items)
         print(f'Woolworths matches: {woolworths_matches}')
 
