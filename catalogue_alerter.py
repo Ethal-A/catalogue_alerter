@@ -215,6 +215,8 @@ async def main():
     parser.add_argument('--woolworths-pages', type=list_of_strings, default=[], help="Provide a list of pages to search in the woolworths catalogue, e.g. page0,page1,page2 where providing nothing has the program search all pages")
     args = parser.parse_args()
     # TODO: provide argument to customise what pages are searched in the coles and woolworths catalogues
+    # TODO: only require postcode if using woolworths
+    # TODO: differentiate between upcoming and current in alerts and log
 
     # Read items arguments
     alert_items = read_alert_items(args.read)
