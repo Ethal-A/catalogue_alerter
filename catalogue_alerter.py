@@ -78,7 +78,7 @@ async def scrape_coles_catalogue(browser, upcoming: bool = True, catalogue_pages
     catalogue_url = await page.evaluate('(element) => element.getAttribute("href")', catalogue_button)
     await page.goto('https://www.coles.com.au' + catalogue_url)
 
-    # Retrieve item titles (got help from ChatGPT for code below)
+    # Retrieve item titles (got help from ChatGPT for javascript code below)
     await page.waitForXPath('//a[@aria-label="Specials of the Week"]') # Wait for the anchors on the pages to load
     titles = []
     if len(catalogue_pages) > 0:
@@ -119,7 +119,7 @@ async def scrape_coles_catalogue(browser, upcoming: bool = True, catalogue_pages
 
     return titles
 
-async def scrape_woolworths_catalogue(browser, postcode: str, upcoming: bool = True, catalogue_pages: list[str] = ['page0', 'page1', 'page2']):
+async def scrape_woolworths_catalogue(browser, postcode: str, upcoming: bool = True, catalogue_pages: list[str] = []):
     '''
     Scrapes pages from the woolworths catalogue (if it is available).
     '''
@@ -151,25 +151,42 @@ async def scrape_woolworths_catalogue(browser, postcode: str, upcoming: bool = T
     catalogue_url = await page.evaluate('(element) => element.getAttribute("href")', catalogue_button)
     await page.goto('https://www.woolworths.com.au' + catalogue_url, options={'waitUntil':'networkidle0'}) # Wait for the anchors on the pages to load
     
-    # Retrieve item titles (got help from ChatGPT for code below)
-    titles = await page.evaluate('''() => {
-        const titles = [];
-        const pageNames = [''' + ''.join(f'"{cp}", ' for cp in catalogue_pages)[:-2] + '''];
-        const allElements = [];
+    # Retrieve item titles (got help from ChatGPT for javascript code below)
+    if len(catalogue_pages) > 0:
+        titles = await page.evaluate('''() => {
+            const titles = [];
+            const pageNames = [''' + ''.join(f'"{cp}", ' for cp in catalogue_pages)[:-2] + '''];
+            const allElements = [];
 
-        pageNames.forEach(pageName => {
-        const selector = `li.${pageName} .slide-content.objloaded a`;
-        const elements = Array.from(document.querySelectorAll(selector));
-        allElements.push(...elements);
-        });
+            pageNames.forEach(pageName => {
+            const selector = `li.${pageName} .slide-content.objloaded a`;
+            const elements = Array.from(document.querySelectorAll(selector));
+            allElements.push(...elements);
+            });
 
-        allElements.forEach((element) => {
-            if (element instanceof HTMLAnchorElement && element.title != '') {
-                titles.push(element.title);
-            }
-        });
-        return titles;
-    }''')
+            allElements.forEach((element) => {
+                if (element instanceof HTMLAnchorElement && element.title != '') {
+                    titles.push(element.title);
+                }
+            });
+            return titles;
+        }''')
+    else:
+        titles = await page.evaluate('''() => {
+            const titles = [];
+            const allElements = [];
+
+            const selector = '.slide-content.objloaded a';
+            const elements = Array.from(document.querySelectorAll(selector));
+            allElements.push(...elements);
+
+            allElements.forEach((element) => {
+                if (element instanceof HTMLAnchorElement && element.title != '') {
+                    titles.push(element.title);
+                }
+            });
+            return titles;
+        }''')
 
     return titles
 
@@ -182,7 +199,12 @@ async def main():
     parser.add_argument('--post-code', '-p', required=True, type=str, help='Postcode to use when scraping from Woolworths')
     parser.add_argument('--headless-mode', action=argparse.BooleanOptionalAction, default=True, help="Runs the browser without a user interface")
     parser.add_argument('--chrome-path', '-e', type=str, help='Absolute path to the achrome file executable')
+    parser.add_argument('--coles', action=argparse.BooleanOptionalAction, default=True, help="Searches the Coles catalogue")
+    parser.add_argument('--woolworths', action=argparse.BooleanOptionalAction, default=True, help="Searches the woolworths catalogue")
     args = parser.parse_args()
+     # TODO: provide argument to customise what pages are searched in the coles and woolworths catalogues
+
+   
 
     # Read items arguments
     alert_items = read_alert_items(args.read)
@@ -195,32 +217,38 @@ async def main():
         browser = await pyppeteer.launch(executablePath=chrome_path, headless=args.headless_mode)
         
         # Search the Coles catalogue
-        coles_catalogue_items = await scrape_coles_catalogue(browser, upcoming=False)
-        coles_matches = match_items(alert_items, coles_catalogue_items)
-        print(f'Coles matches: {coles_matches}')
+        if args.coles:
+            coles_catalogue_items = await scrape_coles_catalogue(browser, upcoming=False)
+            coles_matches = match_items(alert_items, coles_catalogue_items)
+            print(f'Coles matches: {coles_matches}')
 
         # Search the Woolworths catalogue
-        woolworths_catalogue_items = await scrape_woolworths_catalogue(browser, postcode=args.post_code, upcoming=False)
-        woolworths_matches = match_items(alert_items, woolworths_catalogue_items)
-        print(f'Woolworths matches: {woolworths_matches}')
+        if args.woolworths:
+            woolworths_catalogue_items = await scrape_woolworths_catalogue(browser, postcode=args.post_code, upcoming=False)
+            woolworths_matches = match_items(alert_items, woolworths_catalogue_items)
+            print(f'Woolworths matches: {woolworths_matches}')
 
         # Write catalogue items
         if args.output_items:
-            with open('out/coles_catalogue.log', 'a', encoding='utf-8') as file:
-                for item in coles_catalogue_items:
-                    file.write(f'{datetime.now().strftime("%Y-%m-%d")} {item}\n')
-            with open('out/woolworths_catalogue.log', 'a', encoding='utf-8') as file:
-                for item in woolworths_catalogue_items:
-                    file.write(f'{datetime.now().strftime("%Y-%m-%d")} {item}\n')
+            if args.coles:
+                with open('out/coles_catalogue.log', 'a', encoding='utf-8') as file:
+                    for item in coles_catalogue_items:
+                        file.write(f'{datetime.now().strftime("%Y-%m-%d")} {item}\n')
+            if args.woolworths:
+                with open('out/woolworths_catalogue.log', 'a', encoding='utf-8') as file:
+                    for item in woolworths_catalogue_items:
+                        file.write(f'{datetime.now().strftime("%Y-%m-%d")} {item}\n')
         
         # Write alerts
         if args.output_alerts:
-            with open('out/coles_alerts.log', 'a', encoding='utf-8') as file:
-                for match in coles_matches:
-                    file.write(f'{datetime.now().strftime("%Y-%m-%d")} {match}')
-            with open('out/woolworths_alerts.log', 'a', encoding='utf-8') as file:
-                for match in woolworths_matches:
-                    file.write(f'{datetime.now().strftime("%Y-%m-%d")} {match}')
+            if args.coles:
+                with open('out/coles_alerts.log', 'a', encoding='utf-8') as file:
+                    for match in coles_matches:
+                        file.write(f'{datetime.now().strftime("%Y-%m-%d")} {match}')
+            if args.woolworths:
+                with open('out/woolworths_alerts.log', 'a', encoding='utf-8') as file:
+                    for match in woolworths_matches:
+                        file.write(f'{datetime.now().strftime("%Y-%m-%d")} {match}')
 
         # TODO: email alerts
     except Exception as e:
