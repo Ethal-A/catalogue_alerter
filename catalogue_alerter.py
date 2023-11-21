@@ -65,6 +65,7 @@ async def scrape_coles_catalogue(browser, upcoming: bool = False, catalogue_page
     # Open up the catalogue and handle exception scenarios
     catalogue_button = None
     try:
+        # Use aria-label to select the upcoming or current catalogue
         button_to_retrieve = '"View next week\'s catalogue"' if upcoming else '"View this week\'s catalogue"'
         catalogue_button = await page.waitForXPath(f'//a[@aria-label={button_to_retrieve}]')
     except pyppeteer.errors.TimeoutError as timeout_error:
@@ -78,7 +79,7 @@ async def scrape_coles_catalogue(browser, upcoming: bool = False, catalogue_page
     catalogue_url = await page.evaluate('(element) => element.getAttribute("href")', catalogue_button)
     await page.goto('https://www.coles.com.au' + catalogue_url)
 
-    # Retrieve item titles (got help from ChatGPT for javascript code below)
+    # Retrieve item titles
     await page.waitForXPath('//a[@aria-label="Specials of the Week"]') # Wait for the anchors on the pages to load
     titles = []
     if len(catalogue_pages) > 0:
@@ -94,7 +95,7 @@ async def scrape_coles_catalogue(browser, upcoming: bool = False, catalogue_page
             });
 
             allElements.forEach((element) => {
-                if (element instanceof HTMLAnchorElement && element.title != '') {
+                if (element instanceof HTMLAnchorElement && element.title != '' && titles.indexOf(element.title) == -1) {
                     titles.push(element.title);
                 }
             });
@@ -110,7 +111,7 @@ async def scrape_coles_catalogue(browser, upcoming: bool = False, catalogue_page
             allElements.push(...elements);
 
             allElements.forEach((element) => {
-                if (element instanceof HTMLAnchorElement && element.title != '') {
+                if (element instanceof HTMLAnchorElement && element.title != '' && titles.indexOf(element.title) == -1) {
                     titles.push(element.title);
                 }
             });
@@ -155,7 +156,7 @@ async def scrape_woolworths_catalogue(browser, postcode: str, upcoming: bool = F
     catalogue_url = await page.evaluate('(element) => element.getAttribute("href")', catalogue_button)
     await page.goto('https://www.woolworths.com.au' + catalogue_url, options={'waitUntil':'networkidle0'}) # Wait for the anchors on the pages to load
     
-    # Retrieve item titles (got help from ChatGPT for javascript code below)
+    # Retrieve item titles
     if len(catalogue_pages) > 0:
         titles = await page.evaluate('''() => {
             const titles = [];
@@ -169,7 +170,7 @@ async def scrape_woolworths_catalogue(browser, postcode: str, upcoming: bool = F
             });
 
             allElements.forEach((element) => {
-                if (element instanceof HTMLAnchorElement && element.title != '') {
+                if (element instanceof HTMLAnchorElement && element.title != '' && titles.indexOf(element.title) == -1) {
                     titles.push(element.title);
                 }
             });
@@ -185,7 +186,7 @@ async def scrape_woolworths_catalogue(browser, postcode: str, upcoming: bool = F
             allElements.push(...elements);
 
             allElements.forEach((element) => {
-                if (element instanceof HTMLAnchorElement && element.title != '') {
+                if (element instanceof HTMLAnchorElement && element.title != '' && titles.indexOf(element.title) == -1) {
                     titles.push(element.title);
                 }
             });
