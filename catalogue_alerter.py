@@ -54,7 +54,7 @@ def read_alert_items(file_name: str ='items.txt'):
         print(f"File '{file_name}' not found.")
         return []
 
-async def scrape_coles_catalogue(browser, upcoming: bool = True, catalogue_pages: list[str] = []):
+async def scrape_coles_catalogue(browser, upcoming: bool = False, catalogue_pages: list[str] = []):
     '''
     Scrapes pages from the Coles catalogue (if it is available).
     '''
@@ -119,7 +119,7 @@ async def scrape_coles_catalogue(browser, upcoming: bool = True, catalogue_pages
 
     return titles
 
-async def scrape_woolworths_catalogue(browser, postcode: str, upcoming: bool = True, catalogue_pages: list[str] = []):
+async def scrape_woolworths_catalogue(browser, postcode: str, upcoming: bool = False, catalogue_pages: list[str] = []):
     '''
     Scrapes pages from the woolworths catalogue (if it is available).
     '''
@@ -144,10 +144,14 @@ async def scrape_woolworths_catalogue(browser, postcode: str, upcoming: bool = T
         print(exception)
         return []
 
-    # TODO: Test and accomodate upcoming catalogue
-    # Note that Woolworths does not have an upcoming catalogue option
+    # TODO: Error handling (E.g. if upcoming catalogue hasn't been published yet)
     # The Woolworths xpath is more specific to avoid selecting more than one catalogue
-    catalogue_button = await page.waitForXPath('//div[@class="catalogue-content" and ./h3[@class="heading5" and contains(text(), "Weekly Specials")]]/a[@class="read-catalogue"]') # Element is dynamically loaded in so we must wait for it to become visible.
+    # Using a difference in class of a paragraph to select upcoming or current
+    catalogue_button = None
+    if upcoming:
+        catalogue_button = await page.waitForXPath('//div[@class="catalogue-content" and ./h3[@class="heading5" and contains(text(), "Weekly Specials")] and ./p[@class="disclaimer-info"]]/a[@class="read-catalogue"]')
+    else:
+        catalogue_button = await page.waitForXPath('//div[@class="catalogue-content" and ./h3[@class="heading5" and contains(text(), "Weekly Specials")] and ./p[@class="offer-date"]]/a[@class="read-catalogue"]')
     catalogue_url = await page.evaluate('(element) => element.getAttribute("href")', catalogue_button)
     await page.goto('https://www.woolworths.com.au' + catalogue_url, options={'waitUntil':'networkidle0'}) # Wait for the anchors on the pages to load
     
@@ -201,10 +205,9 @@ async def main():
     parser.add_argument('--chrome-path', '-e', type=str, help='Absolute path to the achrome file executable')
     parser.add_argument('--coles', action=argparse.BooleanOptionalAction, default=True, help="Searches the Coles catalogue")
     parser.add_argument('--woolworths', action=argparse.BooleanOptionalAction, default=True, help="Searches the woolworths catalogue")
+    parser.add_argument('--upcoming', action=argparse.BooleanOptionalAction, default=False, help="To search the upcoming catalogues")
     args = parser.parse_args()
      # TODO: provide argument to customise what pages are searched in the coles and woolworths catalogues
-
-   
 
     # Read items arguments
     alert_items = read_alert_items(args.read)
@@ -218,13 +221,13 @@ async def main():
         
         # Search the Coles catalogue
         if args.coles:
-            coles_catalogue_items = await scrape_coles_catalogue(browser, upcoming=False)
+            coles_catalogue_items = await scrape_coles_catalogue(browser, upcoming=args.upcoming)
             coles_matches = match_items(alert_items, coles_catalogue_items)
             print(f'Coles matches: {coles_matches}')
 
         # Search the Woolworths catalogue
         if args.woolworths:
-            woolworths_catalogue_items = await scrape_woolworths_catalogue(browser, postcode=args.post_code, upcoming=False)
+            woolworths_catalogue_items = await scrape_woolworths_catalogue(browser, postcode=args.post_code, upcoming=args.upcoming)
             woolworths_matches = match_items(alert_items, woolworths_catalogue_items)
             print(f'Woolworths matches: {woolworths_matches}')
 
