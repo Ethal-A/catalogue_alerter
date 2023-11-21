@@ -196,6 +196,10 @@ async def scrape_woolworths_catalogue(browser, postcode: str, upcoming: bool = F
     return titles
 
 async def main():
+    # Reference: https://www.geeksforgeeks.org/how-to-pass-a-list-as-a-command-line-argument-with-argparse/
+    def list_of_strings(arg):
+        return arg.split(',')
+    
     # Parse arguments
     parser = argparse.ArgumentParser(description='Catalogue Alerter')
     parser.add_argument('--read', '-r', type=str, default='items.txt', help='File name to read items to alert on')
@@ -207,8 +211,10 @@ async def main():
     parser.add_argument('--coles', action=argparse.BooleanOptionalAction, default=True, help="Searches the Coles catalogue")
     parser.add_argument('--woolworths', action=argparse.BooleanOptionalAction, default=True, help="Searches the woolworths catalogue")
     parser.add_argument('--upcoming', action=argparse.BooleanOptionalAction, default=False, help="To search the upcoming catalogues")
+    parser.add_argument('--coles-pages', type=list_of_strings, default=[], help="Provide a list of pages to search in the coles catalogue, e.g. page0,page1,page2 where providing nothing has the program search all pages")
+    parser.add_argument('--woolworths-pages', type=list_of_strings, default=[], help="Provide a list of pages to search in the woolworths catalogue, e.g. page0,page1,page2 where providing nothing has the program search all pages")
     args = parser.parse_args()
-     # TODO: provide argument to customise what pages are searched in the coles and woolworths catalogues
+    # TODO: provide argument to customise what pages are searched in the coles and woolworths catalogues
 
     # Read items arguments
     alert_items = read_alert_items(args.read)
@@ -222,13 +228,13 @@ async def main():
         
         # Search the Coles catalogue
         if args.coles:
-            coles_catalogue_items = await scrape_coles_catalogue(browser, upcoming=args.upcoming)
+            coles_catalogue_items = await scrape_coles_catalogue(browser, upcoming=args.upcoming, catalogue_pages=args.coles_pages)
             coles_matches = match_items(alert_items, coles_catalogue_items)
             print(f'Coles matches: {coles_matches}')
 
         # Search the Woolworths catalogue
         if args.woolworths:
-            woolworths_catalogue_items = await scrape_woolworths_catalogue(browser, postcode=args.post_code, upcoming=args.upcoming)
+            woolworths_catalogue_items = await scrape_woolworths_catalogue(browser, postcode=args.post_code, upcoming=args.upcoming, catalogue_pages=args.woolworths_pages)
             woolworths_matches = match_items(alert_items, woolworths_catalogue_items)
             print(f'Woolworths matches: {woolworths_matches}')
 
