@@ -54,7 +54,7 @@ def read_alert_items(file_name: str ='items.txt'):
         print(f"File '{file_name}' not found.")
         return []
 
-async def scrape_coles_catalogue(browser, upcoming: bool = True, catalogue_pages: list[str] = ['page1', 'page2', 'page3']):
+async def scrape_coles_catalogue(browser, upcoming: bool = True, catalogue_pages: list[str] = []):
     '''
     Scrapes pages from the Coles catalogue (if it is available).
     '''
@@ -80,24 +80,42 @@ async def scrape_coles_catalogue(browser, upcoming: bool = True, catalogue_pages
 
     # Retrieve item titles (got help from ChatGPT for code below)
     await page.waitForXPath('//a[@aria-label="Specials of the Week"]') # Wait for the anchors on the pages to load
-    titles = await page.evaluate('''() => {
-        const titles = [];
-        const pageNames = [''' + ''.join(f'"{cp}", ' for cp in catalogue_pages)[:-2] + '''];
-        const allElements = [];
+    titles = []
+    if len(catalogue_pages) > 0:
+        titles = await page.evaluate('''() => {
+            const titles = [];
+            const pageNames = [''' + ''.join(f'"{cp}", ' for cp in catalogue_pages)[:-2] + '''];
+            const allElements = [];
 
-        pageNames.forEach(pageName => {
-        const selector = `li.${pageName} .slide-content.objloaded a`;
-        const elements = Array.from(document.querySelectorAll(selector));
-        allElements.push(...elements);
-        });
+            pageNames.forEach(pageName => {
+            const selector = `li.${pageName} .slide-content.objloaded a`;
+            const elements = Array.from(document.querySelectorAll(selector));
+            allElements.push(...elements);
+            });
 
-        allElements.forEach((element) => {
-            if (element instanceof HTMLAnchorElement && element.title != '') {
-                titles.push(element.title);
-            }
-        });
-        return titles;
-    }''')
+            allElements.forEach((element) => {
+                if (element instanceof HTMLAnchorElement && element.title != '') {
+                    titles.push(element.title);
+                }
+            });
+            return titles;
+        }''')
+    else:
+        titles = await page.evaluate('''() => {
+            const titles = [];
+            const allElements = [];
+
+            const selector = '.slide-content.objloaded a';
+            const elements = Array.from(document.querySelectorAll(selector));
+            allElements.push(...elements);
+
+            allElements.forEach((element) => {
+                if (element instanceof HTMLAnchorElement && element.title != '') {
+                    titles.push(element.title);
+                }
+            });
+            return titles;
+        }''')
 
     return titles
 
@@ -165,8 +183,6 @@ async def main():
     parser.add_argument('--headless-mode', action=argparse.BooleanOptionalAction, default=True, help="Runs the browser without a user interface")
     parser.add_argument('--chrome-path', '-e', type=str, help='Absolute path to the achrome file executable')
     args = parser.parse_args()
-
-    print(args)
 
     # Read items arguments
     alert_items = read_alert_items(args.read)
