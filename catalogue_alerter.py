@@ -205,7 +205,7 @@ async def main():
     parser.add_argument('--read', '-r', type=str, default='items.txt', help='File name to read items to alert on')
     parser.add_argument('--output-alerts', '-a', action=argparse.BooleanOptionalAction, default=True, help='Append alerts to files')
     parser.add_argument('--output-items', '-i', action=argparse.BooleanOptionalAction, default=False, help='Append items found in both catalogues to files')
-    parser.add_argument('--post-code', '-p', required=True, type=str, help='Postcode to use when scraping from Woolworths')
+    parser.add_argument('--postcode', '-p', type=str, help='Postcode to use when scraping from Woolworths (required if scraping from Woolworths)')
     parser.add_argument('--headless-mode', action=argparse.BooleanOptionalAction, default=True, help="Runs the browser without a user interface")
     parser.add_argument('--chrome-path', '-e', type=str, help='Absolute path to the achrome file executable')
     parser.add_argument('--coles', action=argparse.BooleanOptionalAction, default=True, help="Searches the Coles catalogue")
@@ -214,8 +214,10 @@ async def main():
     parser.add_argument('--coles-pages', type=list_of_strings, default=[], help="Provide a list of pages to search in the coles catalogue, e.g. page0,page1,page2 where providing nothing has the program search all pages")
     parser.add_argument('--woolworths-pages', type=list_of_strings, default=[], help="Provide a list of pages to search in the woolworths catalogue, e.g. page0,page1,page2 where providing nothing has the program search all pages")
     args = parser.parse_args()
-    # TODO: only require postcode if using woolworths
-    # TODO: differentiate between upcoming and current in alerts and log
+
+    # Ensure postcode is provided if scraping from woolworths
+    if args.woolworths and args.postcode is None:
+        parser.error('--woolworths requires --postcode (-p). Note --woolworths is true by default and can be set to false using --no-woolworths')
 
     # Read items arguments
     alert_items = read_alert_items(args.read)
@@ -235,7 +237,7 @@ async def main():
 
         # Search the Woolworths catalogue
         if args.woolworths:
-            woolworths_catalogue_items = await scrape_woolworths_catalogue(browser, postcode=args.post_code, upcoming=args.upcoming, catalogue_pages=args.woolworths_pages)
+            woolworths_catalogue_items = await scrape_woolworths_catalogue(browser, postcode=args.postcode, upcoming=args.upcoming, catalogue_pages=args.woolworths_pages)
             woolworths_matches = match_items(alert_items, woolworths_catalogue_items)
             print(f'Woolworths matches: {woolworths_matches}')
 
@@ -248,18 +250,18 @@ async def main():
             if args.woolworths:
                 with open('out/woolworths_catalogue.log', 'a', encoding='utf-8') as file:
                     for item in woolworths_catalogue_items:
-                        file.write(f'{datetime.now()} catalogue=woolworths upcoming={args.upcoming} catalogue_pages={args.woolworths_pages} postcode={args.post_code} title={item}\n')
+                        file.write(f'{datetime.now()} catalogue=woolworths upcoming={args.upcoming} catalogue_pages={args.woolworths_pages} postcode={args.postcode} title={item}\n')
         
         # Write alerts
         if args.output_alerts:
             if args.coles:
                 with open('out/coles_alerts.log', 'a', encoding='utf-8') as file:
                     for match in coles_matches:
-                        file.write(f'{datetime.now().strftime("%Y-%m-%d")} {match}')
+                        file.write(f'{datetime.now()} (upcoming={args.upcoming}) {match}')
             if args.woolworths:
                 with open('out/woolworths_alerts.log', 'a', encoding='utf-8') as file:
                     for match in woolworths_matches:
-                        file.write(f'{datetime.now().strftime("%Y-%m-%d")} {match}')
+                        file.write(f'{datetime.now()} (upcoming={args.upcoming}) {match}')
 
         # TODO: email alerts
     except Exception as e:
