@@ -214,7 +214,6 @@ async def main():
     parser.add_argument('--coles-pages', type=list_of_strings, default=[], help="Provide a list of pages to search in the coles catalogue, e.g. page0,page1,page2 where providing nothing has the program search all pages")
     parser.add_argument('--woolworths-pages', type=list_of_strings, default=[], help="Provide a list of pages to search in the woolworths catalogue, e.g. page0,page1,page2 where providing nothing has the program search all pages")
     args = parser.parse_args()
-    # TODO: provide argument to customise what pages are searched in the coles and woolworths catalogues
     # TODO: only require postcode if using woolworths
     # TODO: differentiate between upcoming and current in alerts and log
 
@@ -245,11 +244,11 @@ async def main():
             if args.coles:
                 with open('out/coles_catalogue.log', 'a', encoding='utf-8') as file:
                     for item in coles_catalogue_items:
-                        file.write(f'{datetime.now().strftime("%Y-%m-%d")} {item}\n')
+                        file.write(f'{datetime.now()} catalogue=coles upcoming={args.upcoming} catalogue_pages={args.coles_pages} title={item}\n')
             if args.woolworths:
                 with open('out/woolworths_catalogue.log', 'a', encoding='utf-8') as file:
                     for item in woolworths_catalogue_items:
-                        file.write(f'{datetime.now().strftime("%Y-%m-%d")} {item}\n')
+                        file.write(f'{datetime.now()} catalogue=woolworths upcoming={args.upcoming} catalogue_pages={args.woolworths_pages} postcode={args.post_code} title={item}\n')
         
         # Write alerts
         if args.output_alerts:
