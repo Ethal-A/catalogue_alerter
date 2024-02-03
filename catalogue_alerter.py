@@ -3,6 +3,12 @@ import re
 import asyncio
 import pyppeteer
 from datetime import datetime
+import smtplib
+from email.message import EmailMessage
+from email.mime.text import MIMEText # For formatting
+import ssl # For additional layer of security
+from dotenv import load_dotenv
+import os
 
 OUT_FOLDER = 'out'
 
@@ -53,6 +59,47 @@ def read_alert_items(file_name: str ='items.txt'):
     except FileNotFoundError:
         print(f"File '{file_name}' not found.")
         return []
+
+def format_email(date_time: str, upcoming: bool,
+                 coles_matches: list[str] = [], woolworths_matches: list[str] = [],
+                 coles_catalogue_items: list[str] = [], woolworths_catalogue_items: list[str] = []) -> EmailMessage:
+    '''
+    Formats an email to be sent without specifying the to and from.
+    '''
+    nl = '\n'   # New line
+    msg = EmailMessage()
+    msg['Subject'] = f'{date_time} (upcoming={upcoming}) Catalogue Alert'
+    body = f'''
+<h1>Catalogue Alerter</h1>
+Triggered at {date_time}
+
+<h2>Alerts<h2>
+<h3><font color="red">Coles Alerts</font></h3>
+<ui>
+{''.join(f'<li>{match}</li>' for match in coles_matches)}
+</ui>
+
+<h3><font color="green">Woolworths Alerts</font></h3>
+<ui>
+{''.join(f'<li>{match}</li>' for match in woolworths_matches)}
+</ui>
+
+<br>
+<br>
+
+<h2>Catalogue Items<h2>
+<h3><font color="red">Coles Catalogue Items</font></h3>
+<ui>
+{''.join(f'<li>{item}</li>' for item in coles_catalogue_items)}
+</ui>
+
+<h3><font color="red">Woolworths Catalogue Items</font></h3>
+<ui>
+{''.join(f'<li>{item}</li>' for item in woolworths_catalogue_items)}
+</ui>
+'''
+    msg.set_content(MIMEText(body, 'html'))
+    return msg
 
 async def scrape_coles_catalogue(browser, upcoming: bool = False, catalogue_pages: list[str] = []):
     '''
@@ -206,13 +253,14 @@ async def main():
     parser.add_argument('--output-alerts', '-a', action=argparse.BooleanOptionalAction, default=True, help='Append alerts to files')
     parser.add_argument('--output-items', '-i', action=argparse.BooleanOptionalAction, default=False, help='Append items found in both catalogues to files')
     parser.add_argument('--postcode', '-p', type=str, help='Postcode to use when scraping from Woolworths (required if scraping from Woolworths)')
-    parser.add_argument('--headless-mode', action=argparse.BooleanOptionalAction, default=True, help="Runs the browser without a user interface")
-    parser.add_argument('--chrome-path', '-e', type=str, help='Absolute path to the achrome file executable')
-    parser.add_argument('--coles', action=argparse.BooleanOptionalAction, default=True, help="Searches the Coles catalogue")
-    parser.add_argument('--woolworths', action=argparse.BooleanOptionalAction, default=True, help="Searches the woolworths catalogue")
-    parser.add_argument('--upcoming', action=argparse.BooleanOptionalAction, default=False, help="To search the upcoming catalogues")
-    parser.add_argument('--coles-pages', type=list_of_strings, default=[], help="Provide a list of pages to search in the coles catalogue, e.g. page0,page1,page2 where providing nothing has the program search all pages")
-    parser.add_argument('--woolworths-pages', type=list_of_strings, default=[], help="Provide a list of pages to search in the woolworths catalogue, e.g. page0,page1,page2 where providing nothing has the program search all pages")
+    parser.add_argument('--headless-mode', action=argparse.BooleanOptionalAction, default=True, help='Runs the browser without a user interface')
+    parser.add_argument('--chrome-path', '-x', type=str, help='Absolute path to the achrome file executable')
+    parser.add_argument('--coles', action=argparse.BooleanOptionalAction, default=True, help='Searches the Coles catalogue')
+    parser.add_argument('--woolworths', action=argparse.BooleanOptionalAction, default=True, help='Searches the woolworths catalogue')
+    parser.add_argument('--upcoming', action=argparse.BooleanOptionalAction, default=False, help='To search the upcoming catalogues')
+    parser.add_argument('--coles-pages', type=list_of_strings, default=[], help='Provide a list of pages to search in the coles catalogue, e.g. page0,page1,page2 where providing nothing has the program search all pages')
+    parser.add_argument('--woolworths-pages', type=list_of_strings, default=[], help='Provide a list of pages to search in the woolworths catalogue, e.g. page0,page1,page2 where providing nothing has the program search all pages')
+    parser.add_argument('--email', '-e', type=list_of_strings, default=[], help='Provide a list of email addresses to send alerts and catalogue lists to. You must have a .env file to use this functionality, see env.example.txt for an example')
     args = parser.parse_args()
 
     # Ensure postcode is provided if scraping from woolworths
@@ -263,7 +311,36 @@ async def main():
                     for match in woolworths_matches:
                         file.write(f'{datetime.now()} (upcoming={args.upcoming}) {match}')
 
-        # TODO: email alerts
+        if len(args.email) > 0:
+            # Load environment variables from .env file
+            load_dotenv()
+            gmail_address = os.getenv('GMAIL_ADDRESS')
+            gmail_app_password = os.getenv('GMAIL_APP_PASSWORD')
+            if gmail_address == None or gmail_app_password == None:
+                raise IOError('.env or environment variables GMAIL_ADDRESS or GMAIL_APP_PASSWORD are missing')
+            
+            # Prepare default values for variables to avoid errors
+            coles_matches = [] if 'coles_matches' not in locals() else coles_matches
+            woolworths_matches = [] if 'woolworths_matches' not in locals() else woolworths_matches
+            coles_catalogue_items = [] if 'coles_catalogue_items' not in locals() else coles_catalogue_items
+            woolworths_catalogue_items = [] if 'woolworths_catalogue_items' not in locals() else woolworths_catalogue_items
+
+            # Prepare email
+            dt = datetime.now().strftime("%Y-%m-%d %H:%M")
+            msg = format_email(dt, args.upcoming,
+                               coles_matches,
+                               woolworths_matches,
+                               coles_catalogue_items,
+                               woolworths_catalogue_items)
+            msg['From'] = gmail_address
+            msg['To'] = ', '.join(args.email)
+
+            # Authenticate to GMail and send email
+            ssl_context = ssl.create_default_context()
+            with smtplib.SMTP_SSL('smtp.gmail.com', 465, context=ssl_context) as smtp:  # Gmail uses port 465 for SMTPS (Simple Mail Transfer Protocol Secure)
+                smtp.login(gmail_address, gmail_app_password)
+                smtp.sendmail(gmail_address, args.email, msg.as_string())
+
     except Exception as e:
         print('Error:', type(e), '-', str(e))
     finally:
