@@ -136,9 +136,9 @@ async def scrape_coles_catalogue(browser, upcoming: bool = False, catalogue_page
             const allElements = [];
 
             pageNames.forEach(pageName => {
-            const selector = `li.${pageName} .slide-content.objloaded a`;
-            const elements = Array.from(document.querySelectorAll(selector));
-            allElements.push(...elements);
+                const selector = `li.${pageName} .slide-content.objloaded a[href*="product"]`;
+                const elements = Array.from(document.querySelectorAll(selector));
+                allElements.push(...elements);
             });
 
             allElements.forEach((element) => {
@@ -153,8 +153,7 @@ async def scrape_coles_catalogue(browser, upcoming: bool = False, catalogue_page
             const titles = [];
             const allElements = [];
 
-            const selector = '.slide-content.objloaded a';
-            const elements = Array.from(document.querySelectorAll(selector));
+            const elements = Array.from(document.querySelectorAll('.slide-content.objloaded a[href*="product"]'));
             allElements.push(...elements);
 
             allElements.forEach((element) => {
@@ -211,7 +210,7 @@ async def scrape_woolworths_catalogue(browser, postcode: str, upcoming: bool = F
             const allElements = [];
 
             pageNames.forEach(pageName => {
-            const selector = `li.${pageName} .slide-content.objloaded a`;
+            const selector = `li.${pageName} .slide-content.objloaded a[href*="product"]`;
             const elements = Array.from(document.querySelectorAll(selector));
             allElements.push(...elements);
             });
@@ -228,8 +227,7 @@ async def scrape_woolworths_catalogue(browser, postcode: str, upcoming: bool = F
             const titles = [];
             const allElements = [];
 
-            const selector = '.slide-content.objloaded a';
-            const elements = Array.from(document.querySelectorAll(selector));
+            const elements = Array.from(document.querySelectorAll('.slide-content.objloaded a[href*="product"]'));
             allElements.push(...elements);
 
             allElements.forEach((element) => {
@@ -271,7 +269,7 @@ async def main():
     alert_items = read_alert_items(args.read)
     chrome_path = args.chrome_path
     try:
-        # For testing purposes only
+        # For testing purposes only - TODO: Remove once testing is complete
         chrome_path = "C:\Program Files\Google\Chrome\Application\chrome.exe"
 
         # pyppeteer will use a default executable path if args.chrome_path is None
