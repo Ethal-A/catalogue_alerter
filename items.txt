@@ -4,4 +4,5 @@ This part will be read as an item # This part will not
 This is an item which includes a hashtag \# in the name and will be read
 
 # An example of how this can be used is provided below:
-Chocolate # Any chocolate
+Chocolate # Any chocolate (item titles are not case sensitive)
+Banana milkshake # Each new line represents a different item and spaces between text is treated a space in the title

@@ -247,7 +247,7 @@ async def main():
     
     # Parse arguments
     parser = argparse.ArgumentParser(description='Catalogue Alerter')
-    parser.add_argument('--read', '-r', type=str, default='items.txt', help='File name to read items to alert on')
+    parser.add_argument('--read', '-r', type=str, default='items.txt', help='File name to read items to alert on (default: items.txt)')
     parser.add_argument('--output-alerts', '-a', action=argparse.BooleanOptionalAction, default=True, help='Append alerts to files')
     parser.add_argument('--output-items', '-i', action=argparse.BooleanOptionalAction, default=False, help='Append items found in both catalogues to files')
     parser.add_argument('--postcode', '-p', type=str, help='Postcode to use when scraping from Woolworths (required if scraping from Woolworths)')
