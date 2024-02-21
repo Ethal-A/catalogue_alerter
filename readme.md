@@ -70,11 +70,16 @@ Once you have your app password copy the content below into a file titled `.env`
 GMAIL_ADDRESS="example<span>@gmail.com" <br> <!-- a <span> is used here to prevent this line from becoming a hyperlink -->
 GMAIL_APP_PASSWORD="example app password" <br>
 
-The screenshot below displays what emails look like. The subject of email was '2024-02-21 21:54 (upcoming=False) Catalogue Alert'. The command and options used were `python catalogue_alerter.py --postcode <postcode> --headless-mode --no-upcoming --woolworths-pages page0,page1 --coles-pages page0,page1 --email <email>` where \<postcode> and \<email> were replaced with a postcode and email address.
+The screenshot below displays what emails look like. The subject of email was '2024-02-21 21:54 (upcoming=False) Catalogue Alert'. The command and options used were `python catalogue_alerter.py --chrome-path "C:\Program Files\Google\Chrome\Application\chrome.exe" --postcode <postcode> --no-headless-mode --no-upcoming --woolworths-pages page0,page1 --coles-pages page0,page1 --email <email>` where \<postcode> and \<email> were replaced with a postcode and email address. Note that not all options used in the command are necessary such as `--no-headless-mode`.
 
 ![Email Example](/images/Email%20Example.png)
 
 ## Troubleshooting
 Ensure you are using the `--chrome-path` or `-x` optional argument to provide the path to your local Chrome executable. Pyppeteer uses an old version of Chrome which does not support newer features utilised by modern websites.
 
+If you are experiencing a timeout error, try running the same command with `--no-headless-mode`. This will sometimes fix the issue.
+
 Check out what the program itself is seeing using the optional argument `--no-headless-mode`. When you run the program with this optional argument, it will open a visible Chrome browser abd show you what it is seeing and doing.
+
+## Known Bugs
+At the moment there is a bug preventing the scrape of the Woolworths upcoming catalogue.

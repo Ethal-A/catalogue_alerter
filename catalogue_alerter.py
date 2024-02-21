@@ -190,14 +190,25 @@ async def scrape_woolworths_catalogue(browser, postcode: str, upcoming: bool = F
         print(exception)
         return []
 
-    # TODO: Error handling (E.g. if upcoming catalogue hasn't been published yet)
-    # The Woolworths xpath is more specific to avoid selecting more than one catalogue
-    # Using a difference in class of a paragraph to select upcoming or current
+    # Handle exception scenarios including timeout due to element not found
     catalogue_button = None
-    if upcoming:    # BUG: Woolworths scraper will not work for the upcoming catalogue as the xpath has not been updated to work with the updated woolworths website
-        catalogue_button = await page.waitForXPath('//div[@class="catalogue-content" and ./h3[@class="heading5" and contains(text(), "Weekly Specials")] and ./p[@class="disclaimer-info"]]/a[@class="read-catalogue"]')
-    else:
-        catalogue_button = await page.waitForXPath('//div[@class="tile_component_content__pkyso" and ./div[@class="tile_component_heading__6SeSl" and contains(text(), "Weekly Specials")]]/a[@class="core-button core-button-secondary"]')
+    try:
+        if upcoming:
+            # BUG: Woolworths scraper will not work for the upcoming catalogue as the xpath has not been updated to work with the updated woolworths website
+            # BUG: The Woolworths xpath may need to be more specific to avoid selecting more than one catalogue
+            print('WARNING: A bug in the program prevents it from scraping the Woolworths upcoming catalogue')
+            catalogue_button = await page.waitForXPath('//div[@class="catalogue-content" and ./h3[@class="heading5" and contains(text(), "Weekly Specials")] and ./p[@class="disclaimer-info"]]/a[@class="read-catalogue"]')
+        else:
+            catalogue_button = await page.waitForXPath('//div[@class="tile_component_content__pkyso" and ./div[@class="tile_component_heading__6SeSl" and contains(text(), "Weekly Specials")]]/a[@class="core-button core-button-secondary"]')
+    except pyppeteer.errors.TimeoutError as timeout_error:
+        button_type = 'upcoming' if upcoming else 'not upcoming'
+        print(f'Failed to retrieve Woolworths {button_type} catalogue button within 30 seconds')
+        print(timeout_error)
+        return []
+    except Exception as exception:
+        print(f'Something went wrong when trying to retrieve Coles catalogue button {button_to_retrieve}')
+        print(exception)
+        return []
     catalogue_url = await page.evaluate('(element) => element.getAttribute("href")', catalogue_button)
     await page.goto('https://www.woolworths.com.au' + catalogue_url, options={'waitUntil':'networkidle0'}) # Wait for the anchors on the pages to load
     
@@ -268,9 +279,6 @@ async def main():
     alert_items = read_alert_items(args.read)
     chrome_path = args.chrome_path
     try:
-        # For testing purposes only - TODO: Remove once testing is complete
-        chrome_path = "C:\Program Files\Google\Chrome\Application\chrome.exe"
-
         # pyppeteer will use a default executable path if args.chrome_path is None
         browser = await pyppeteer.launch(executablePath=chrome_path, headless=args.headless_mode)
         
