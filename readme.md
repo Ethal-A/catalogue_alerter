@@ -70,6 +70,10 @@ Once you have your app password copy the content below into a file titled `.env`
 GMAIL_ADDRESS="example<span>@gmail.com" <br> <!-- a <span> is used here to prevent this line from becoming a hyperlink -->
 GMAIL_APP_PASSWORD="example app password" <br>
 
+The screenshot below displays what emails look like. The subject of email was '2024-02-21 21:54 (upcoming=False) Catalogue Alert'. The command and options used were `python catalogue_alerter.py --postcode <postcode> --headless-mode --no-upcoming --woolworths-pages page0,page1 --coles-pages page0,page1 --email <email>` where \<postcode> and \<email> were replaced with a postcode and email address.
+
+![Email Example](/images/Email%20Example.png)
+
 ## Troubleshooting
 Ensure you are using the `--chrome-path` or `-x` optional argument to provide the path to your local Chrome executable. Pyppeteer uses an old version of Chrome which does not support newer features utilised by modern websites.
 

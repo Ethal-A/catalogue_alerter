@@ -194,7 +194,7 @@ async def scrape_woolworths_catalogue(browser, postcode: str, upcoming: bool = F
     # The Woolworths xpath is more specific to avoid selecting more than one catalogue
     # Using a difference in class of a paragraph to select upcoming or current
     catalogue_button = None
-    if upcoming:
+    if upcoming:    # BUG: Woolworths scraper will not work for the upcoming catalogue as the xpath has not been updated to work with the updated woolworths website
         catalogue_button = await page.waitForXPath('//div[@class="catalogue-content" and ./h3[@class="heading5" and contains(text(), "Weekly Specials")] and ./p[@class="disclaimer-info"]]/a[@class="read-catalogue"]')
     else:
         catalogue_button = await page.waitForXPath('//div[@class="tile_component_content__pkyso" and ./div[@class="tile_component_heading__6SeSl" and contains(text(), "Weekly Specials")]]/a[@class="core-button core-button-secondary"]')
