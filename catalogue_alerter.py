@@ -172,16 +172,15 @@ async def scrape_woolworths_catalogue(browser, postcode: str, upcoming: bool = F
     '''
     # Create a new page and go to the woolworths catalogue website
     page = await browser.newPage()
-    await page.setUserAgent("Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1; SV1; .NET CLR 1.1.4322)"); # Pyppeteer user agent is blocked by Woolworths so we change it
+    await page.setUserAgent("Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1; SV1; .NET CLR 1.1.4322)") # Pyppeteer user agent is blocked by Woolworths so we change it
     await page.goto("https://www.woolworths.com.au/shop/catalogue")
 
     # Provide the postcode and open the first location that pops up
     try:
         catalogue_location_autocomplete = await page.waitForXPath('//input[@id="wx-digital-catalogue-autocomplete"]')
-        await catalogue_location_autocomplete.type(postcode)
-        catalogue_location_first_autocomplete = await page.waitForXPath('//li[@id="wx-digital-catalogue-autocomplete__option--0"]')
-        await catalogue_location_first_autocomplete.click()
-        # await page.waitForNavigation()
+        await catalogue_location_autocomplete.type(postcode, options={'delay': 10})
+        catalogue_location_first_autocomplete = await page.waitForXPath('//li[@id="wx-digital-catalogue-autocomplete-item-0"]')
+        await page.evaluate('button => button.click()', catalogue_location_first_autocomplete)    # Using 'await catalogue_location_first_autocomplete.click()' is unreliable
     except pyppeteer.errors.TimeoutError as timeout_error:
         print(f'Failed to retrieve elements to select the Woolworths location using the provided postcode within 30 seconds')
         print(timeout_error)
@@ -198,7 +197,7 @@ async def scrape_woolworths_catalogue(browser, postcode: str, upcoming: bool = F
     if upcoming:
         catalogue_button = await page.waitForXPath('//div[@class="catalogue-content" and ./h3[@class="heading5" and contains(text(), "Weekly Specials")] and ./p[@class="disclaimer-info"]]/a[@class="read-catalogue"]')
     else:
-        catalogue_button = await page.waitForXPath('//div[@class="catalogue-content" and ./h3[@class="heading5" and contains(text(), "Weekly Specials")] and ./p[@class="offer-date"]]/a[@class="read-catalogue"]')
+        catalogue_button = await page.waitForXPath('//div[@class="tile_component_content__pkyso" and ./div[@class="tile_component_heading__6SeSl" and contains(text(), "Weekly Specials")]]/a[@class="core-button core-button-secondary"]')
     catalogue_url = await page.evaluate('(element) => element.getAttribute("href")', catalogue_button)
     await page.goto('https://www.woolworths.com.au' + catalogue_url, options={'waitUntil':'networkidle0'}) # Wait for the anchors on the pages to load
     
